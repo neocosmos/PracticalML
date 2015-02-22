@@ -1,0 +1,104 @@
+---
+title: "Fashion Prediction of the Unilateral Dumbbell Biceps Curl"
+author: "neocosmos"
+date: "Sunday, February 22, 2015"
+output: html_document
+---
+#Introduction
+The human activity recognition research has traditionally focused on discriminating between different activities, i.e. to predict which activity was performed at a specific point in time.
+In this study, six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). We will build models to predict the manner in which they did the exercise using data from accelerometers on the belt, forearm, arm, and dumbell of the 6 participants.
+
+
+#Load libraries and  data
+```{r, message=FALSE, warning=FALSE}
+     library(caret)
+     library(randomForest)
+```
+
+Download the training data and test data
+```{r}
+if (!file.exists("./pml-training.csv")) {
+    trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+    download.file(trainUrl, destfile="./pml-training.csv", method = "curl")    
+    }
+if (!file.exists("./pml-testing.csv")) {
+    testUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+    download.file(testUrl, destfile="./pml-testing.csv", method="curl")
+    }
+```
+
+Read in the data. The "#DIV/0!" and missing values are taken as NA.
+```{r}
+    m_train <- read.csv("pml-training.csv", na.strings=c("NA", "#DIV/0!", " "))
+    m_test  <- read.csv("pml-testing.csv",  na.strings=c("NA", "#DIV/0!", " "))
+```
+
+#Clean the data
+
+The data contain many NA and zero variance predictors. We need to delete the unuselful variables to build the models.  
+
+1. Remove the zero variance predictors 
+```{r}
+    m_train <- m_train[-nearZeroVar(m_train)]
+```
+
+2. Next, we examine the percentage of NA in each column.
+```{r, results='hide'}
+    colSums(is.na(m_train)) /nrow(m_train) 
+```
+
+For the column with NA, the percentage of NA is more than 98%. So we remove the corresponding variables.
+```{r}
+    m_train <- m_train[!colSums(is.na(m_train))]
+```
+
+3. For the first 7 volumns, the ID, window, timestamp is not useful for building the predication model. 
+```{r}
+    m_train <- m_train[c(-1,-3:-7)]
+```
+    
+And we need to perform the same procedure for the test data.
+```{r}
+    m_test <- m_test[-nearZeroVar(m_test)]
+    m_test <- m_test[!colSums(is.na(m_test))]
+    m_test <- m_test[c(-1,-3:-7)]
+```
+
+#Data Partition
+
+The data is splitted into two parts:
+```{r}
+    set.seed(1234)
+    inTrain    <- createDataPartition(y=m_train$classe, p=0.6, list=FALSE)
+    train_data <- m_train[inTrain, ]
+    val_data   <- m_train[-inTrain, ]
+```
+
+#Training model
+
+We use the Breiman's random forest algorithm to classification and regression.
+```{r}
+    model <- randomForest(classe ~ ., data = train_data, ntree=200)
+```
+
+#Cross-Validation
+Then we perform the model to the validation set.
+```{r}
+    m_predict <- predict(model, val_data)
+    confusionMatrix(val_data$classe, m_predict)
+```
+
+The accuracy is 99.27%, which implies that the training model is accurate in predicating. The out-of-sample error is 0.0073. 
+
+#Results of the 20 test cases
+The built machine learning algorithm is applied to each of the 20 test cases in the testing data set.
+```{r}
+    answers <- predict(model, m_test) 
+    answers
+```
+The built algorithm provides correct result for the 20 test cases.
+
+#Reference for the WLE dataset
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+ 
